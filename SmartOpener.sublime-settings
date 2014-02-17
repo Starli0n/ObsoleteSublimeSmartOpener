@@ -1,0 +1,8 @@
+{
+    "env":
+    [
+        { "Prod" : "path/to/Prod/" },
+        { "Dev" : "path/to/Dev/" },
+        { "UAT" : "path/to/UAT/" }
+    ]
+}

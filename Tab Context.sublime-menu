@@ -1,0 +1,5 @@
+[
+	{ "caption": "-" },
+	{ "caption": "Open File From Env", "command": "open_file_from_env" },
+	{ "caption": "-"}
+]

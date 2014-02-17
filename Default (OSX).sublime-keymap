@@ -1,0 +1,4 @@
+[
+    { "keys": ["super+ctrl+o"],  "command": "open_file_from_env" },
+    { "keys": ["f2"], "command": "open_under_selection" }
+]
