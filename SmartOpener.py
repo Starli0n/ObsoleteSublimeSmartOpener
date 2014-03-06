@@ -22,7 +22,8 @@ class Prefs:
         sublime.run_command("verbose", {"plugin_name": PluginName, "log": "############################################################"})
 
 
-Prefs.load()
+if int(sublime.version()) < 3000:
+    Prefs.load()
 
 
 ### OpenFileFromEnv ###
