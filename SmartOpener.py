@@ -89,9 +89,10 @@ class OpenFileFromEnvCommand(sublime_plugin.TextCommand):
         Prefs.show()
         sublime.run_command("verbose", {"plugin_name": PluginName, "log": "is_enabled()"})
 
-        fileName = self.view.file_name().lower()
+        fileName = self.view.file_name()
         self.m_srcEnv = None
         if fileName and len(fileName) > 0:
+            fileName = fileName.lower()
             sublime.run_command("verbose", {"plugin_name": PluginName, "log": "fileName: " + fileName})
             # Loop into registered environment
             envs = Prefs.env
