@@ -6,6 +6,12 @@ import os
 
 PluginName = 'SmartOpener'
 
+
+def verbose(**kwargs):
+    kwargs.update({'plugin_name': PluginName})
+    sublime.run_command("verbose", kwargs)
+
+
 class Prefs:
     @staticmethod
     def load():
@@ -14,12 +20,12 @@ class Prefs:
 
     @staticmethod
     def show():
-        sublime.run_command("verbose", {"plugin_name": PluginName, "log": "############################################################"})
+        verbose(log="############################################################")
         envs = Prefs.env
         for env in envs:
             for key, value in env.items():
-                sublime.run_command("verbose", {"plugin_name": PluginName, "log": key + ": " + value})
-        sublime.run_command("verbose", {"plugin_name": PluginName, "log": "############################################################"})
+                verbose(log=key + ": " + value)
+        verbose(log="############################################################")
 
 
 if int(sublime.version()) < 3000:
@@ -40,13 +46,13 @@ class OpenFileFromEnvCommand(sublime_plugin.TextCommand):
     m_envFiles = []
 
     def run(self, edit):
-        sublime.run_command("verbose", {"plugin_name": PluginName, "log": "run()"})
+        verbose(log="run()")
 
         # Find baseName by removing the source environment
         baseName = self.view.file_name().lower().replace(self.m_srcEnv.lower(), "")
 
-        sublime.run_command("verbose", {"plugin_name": PluginName, "log": "m_srcEnv: " + self.m_srcEnv})
-        sublime.run_command("verbose", {"plugin_name": PluginName, "log": "baseName: " + baseName})
+        verbose(log="m_srcEnv: " + self.m_srcEnv)
+        verbose(log="baseName: " + baseName)
 
         if len(baseName) > 0:
 
@@ -67,10 +73,10 @@ class OpenFileFromEnvCommand(sublime_plugin.TextCommand):
                     # Check if the file exists in an another environment
                     envFileName = os.path.join(value, baseName)
                     if os.path.exists(envFileName):
-                        sublime.run_command("verbose", {"plugin_name": PluginName, "log": "[X] envFileName " + envFileName})
+                        verbose(log="[X] envFileName " + envFileName)
                         self.m_envFiles.append([key, envFileName])
                     else:
-                        sublime.run_command("verbose", {"plugin_name": PluginName, "log": "[ ] envFileName " + envFileName})
+                        verbose(log="[ ] envFileName " + envFileName)
 
             if len(self.m_envFiles) > 0:
                 self.view.window().show_quick_panel(self.m_envFiles, self.quick_panel_done)
@@ -88,13 +94,13 @@ class OpenFileFromEnvCommand(sublime_plugin.TextCommand):
     # Return True if the file is part of an environment
     def is_enabled(self):
         Prefs.show()
-        sublime.run_command("verbose", {"plugin_name": PluginName, "log": "is_enabled()"})
+        verbose(log="is_enabled()")
 
         fileName = self.view.file_name()
         self.m_srcEnv = None
         if fileName and len(fileName) > 0:
             fileName = fileName.lower()
-            sublime.run_command("verbose", {"plugin_name": PluginName, "log": "fileName: " + fileName})
+            verbose(log="fileName: " + fileName)
             # Loop into registered environment
             envs = Prefs.env
             for env in envs:
