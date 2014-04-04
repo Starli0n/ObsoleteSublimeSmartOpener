@@ -16,15 +16,15 @@ class Prefs:
     @staticmethod
     def load():
         settings = sublime.load_settings(PluginName + '.sublime-settings')
-        Prefs.env = settings.get('env', [])
+        Prefs.environment = settings.get('environment', [])
+        Prefs.expand_alias = settings.get('expand_alias', True)
 
     @staticmethod
     def show():
         verbose(log="############################################################")
-        envs = Prefs.env
-        for env in envs:
-            for key, value in env.items():
-                verbose(log=key + ": " + value)
+        for env in Prefs.environment:
+            for key, values in env.items():
+                verbose(log=key + ": " + ';'.join(values))
         verbose(log="############################################################")
 
 
@@ -40,80 +40,105 @@ if int(sublime.version()) < 3000:
 class OpenFileFromEnvCommand(sublime_plugin.TextCommand):
 
     # Set by is_enabled()
-    m_srcEnv = ""
+    initial_env_name = ''
+    base_name = ''
 
     # List of existing files in other environments
-    m_envFiles = []
+    env_files = []
 
     def run(self, edit):
         verbose(log="run()")
 
-        # Find baseName by removing the source environment
-        baseName = self.view.file_name().lower().replace(self.m_srcEnv.lower(), "")
+        verbose(log="initial_env_name: " + self.initial_env_name)
+        verbose(log="base_name: " + self.base_name)
 
-        verbose(log="m_srcEnv: " + self.m_srcEnv)
-        verbose(log="baseName: " + baseName)
+        if len(self.base_name) > 0:
+            # Create a list of files which exist in other environment
+            self.env_files = []
+            for env in Prefs.environment:
+                for env_name, root_alias in env.items():
 
-        if len(baseName) > 0:
-
-            # Remove first slash or backslash from baseName
-            if baseName[0] == os.sep:
-                baseName = baseName.replace(os.sep, "", 1)
-
-            # Create a list of file which exist in other environment
-            self.m_envFiles = []
-            envs = Prefs.env
-            for env in envs:
-                for key, value in env.items():
-
-                    # Bypass source environment
-                    if self.m_srcEnv == value:
+                    # Bypass initial environment
+                    if env_name == self.initial_env_name:
                         continue
 
-                    # Check if the file exists in an another environment
-                    envFileName = os.path.join(value, baseName)
-                    if os.path.exists(envFileName):
-                        verbose(log="[X] envFileName " + envFileName)
-                        self.m_envFiles.append([key, envFileName])
-                    else:
-                        verbose(log="[ ] envFileName " + envFileName)
+                    # Loop in path alias of the current environment
+                    available_file_names = []
+                    for root in root_alias:
+                        env_file_name = os.path.join(root, self.base_name)
+                        state = ' '
+                        if os.path.exists(env_file_name):
+                            state = 'X'
+                            if Prefs.expand_alias:
+                                self.env_files.append([env_name, env_file_name])
+                            else:
+                                available_file_names.append(env_file_name)
+                        verbose(log='[%s] %15s %s' % (state, env_name, env_file_name))
 
-            if len(self.m_envFiles) > 0:
-                self.view.window().show_quick_panel(self.m_envFiles, self.quick_panel_done)
+                    if len(available_file_names) > 0:
+                        # available_file_names used only with expand_alias = False
+                        current_id = self.view.id()
+                        is_file_opened = False
+                        # Find the first file of the environment which is already opened in st
+                        for v in self.view.window().views():
+                            if v.id() == current_id:
+                                continue
+                            for file_name in available_file_names:
+                                if file_name.lower() == v.file_name().lower():
+                                    self.env_files.append([env_name, file_name])
+                                    is_file_opened = True
+                                    break
+                            if is_file_opened:
+                                break
+                        # Or choose the file of the environment of the main path
+                        if not is_file_opened:
+                            self.env_files.append([env_name, available_file_names[0]])
+
+            if len(self.env_files) > 0:
+                self.view.window().show_quick_panel(self.env_files, self.quick_panel_done)
             else:
                 sublime.status_message("No file found in other environments")
 
 
     def quick_panel_done(self, index):
-        if index == -1:
-            return
-        # Open selected file in an another environment
-        self.view.window().open_file(self.m_envFiles[index][1])
+        if index > -1:
+            # Open selected file in an another environment
+            self.view.window().open_file(self.env_files[index][1])
 
+
+    def is_filename_part_of_env(self, file_name, root_alias):
+        for root in root_alias:
+            # Remove trailing os.sep
+            root = os.path.normpath(root).lower()
+            if file_name.startswith(root):
+                base_name = file_name.replace(root.lower(), "")
+                if base_name[0] == os.sep:
+                    # Get back the original case
+                    file_name = self.view.file_name()
+                    # Remove first os.sep character and get base name
+                    self.base_name = file_name[len(file_name)-len(base_name)+1:]
+                    return True
+        return False
 
     # Return True if the file is part of an environment
     def is_enabled(self):
         Prefs.show()
         verbose(log="is_enabled()")
 
-        fileName = self.view.file_name()
-        self.m_srcEnv = None
-        if fileName and len(fileName) > 0:
-            fileName = fileName.lower()
-            verbose(log="fileName: " + fileName)
-            # Loop into registered environment
-            envs = Prefs.env
-            for env in envs:
-                for key, value in env.items():
-                    # Test if fileName is part of an environment
-                    if fileName.startswith(os.path.normpath(value).lower()):
-                        # Keep the environments with the longest size as origin
-                        if self.m_srcEnv and len(value) <= len(self.m_srcEnv):
-                            continue
-                        self.m_srcEnv = value
+        file_name = self.view.file_name()
+        self.initial_env_name = ''
+        base_name = ''
+        if file_name is not None and len(file_name) > 0:
+            file_name = file_name.lower()
+            verbose(log="file_name: " + file_name)
 
-        if self.m_srcEnv:
-            return True
+            # Loop into registered environment
+            for env in Prefs.environment:
+                for env_name, root_alias in env.items():
+                    # Test if file_name is part of an environment
+                    if self.is_filename_part_of_env(file_name, root_alias):
+                        self.initial_env_name = env_name
+                        return True
 
         sublime.status_message("The current file is not part of an environment")
         return False
